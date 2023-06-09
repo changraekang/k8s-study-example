@@ -1,0 +1,132 @@
+Name:             mariadb-sts-0
+Namespace:        kang
+Priority:         0
+Service Account:  default
+Node:             minikube/192.168.49.2
+Start Time:       Fri, 09 Jun 2023 10:46:11 +0900
+Labels:           app=mariadb
+                  controller-revision-hash=mariadb-sts-65d6f7564
+                  statefulset.kubernetes.io/pod-name=mariadb-sts-0
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.234
+IPs:
+  IP:           10.244.0.234
+Controlled By:  StatefulSet/mariadb-sts
+Init Containers:
+  init-mariadb:
+    Container ID:  docker://ebccf8768cdc0432c3d5e18466881234a408bf5aeae700d357163b9ffdc59b01
+    Image:         mariadb
+    Image ID:      docker-pullable://mariadb@sha256:b11a86131ac592eaabede175b3547d12d2c96d63c71936af28217ffc3bb3fee2
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      bash
+      -c
+      set -ex
+      echo 'Starting init-mariadb';
+      # Check config map to directory that already exists 
+      # (but must be used as a volume for main container)
+      ls /mnt/config-map
+      # Statefulset has sticky identity, number should be last
+      [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+      ordinal=${BASH_REMATCH[1]}
+      # Copy appropriate conf.d files from config-map to 
+      # mariadb-config volume (emptyDir) depending on pod number
+      if [[ $ordinal -eq 0 ]]; then
+        # This file holds SQL for connecting to primary
+        cp /mnt/config-map/primary.cnf /etc/mysql/conf.d/server-id.cnf
+        # Create the users needed for replication on primary on a volume
+        # initdb (emptyDir)
+        cp /mnt/config-map/primary.sql /docker-entrypoint-initdb.d
+      else
+        # This file holds SQL for connecting to secondary
+        cp /mnt/config-map/replica.cnf /etc/mysql/conf.d/server-id.cnf
+        # On replicas use secondary configuration on initdb volume
+        cp /mnt/config-map/secondary.sql /docker-entrypoint-initdb.d
+      fi
+      # Add an offset to avoid reserved server-id=0 value.
+      echo server-id=$((3000 + $ordinal)) >> etc/mysql/conf.d/server-id.cnf
+      ls /etc/mysql/conf.d/
+      cat /etc/mysql/conf.d/server-id.cnf
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Fri, 09 Jun 2023 10:46:14 +0900
+      Finished:     Fri, 09 Jun 2023 10:46:14 +0900
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /docker-entrypoint-initdb.d from initdb (rw)
+      /etc/mysql/conf.d/ from mariadb-config (rw)
+      /mnt/config-map from mariadb-config-map (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-nnvg8 (ro)
+Containers:
+  mariadb:
+    Container ID:   docker://7f5fe747343ea6b7579d487a71e3f799d2dadb9a5c5f2686e60e45f1bf9166dc
+    Image:          mariadb
+    Image ID:       docker-pullable://mariadb@sha256:b11a86131ac592eaabede175b3547d12d2c96d63c71936af28217ffc3bb3fee2
+    Port:           3306/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Fri, 09 Jun 2023 10:46:17 +0900
+    Ready:          True
+    Restart Count:  0
+    Liveness:       exec [/usr/local/bin/healthcheck.sh --su=mysql --connect --innodb_initialized] delay=20s timeout=1s period=25s #success=1 #failure=3
+    Environment:
+      MARIADB_ROOT_PASSWORD:           <set to the key 'mariadb-root-password' in secret 'mariadb-secret'>  Optional: false
+      MYSQL_INITDB_SKIP_TZINFO:        1
+      MARIADB_MYSQL_LOCALHOST_USER:    1
+      MARIADB_MYSQL_LOCALHOST_GRANTS:  REPLICA MONITOR
+    Mounts:
+      /docker-entrypoint-initdb.d from initdb (rw)
+      /etc/mysql/conf.d/ from mariadb-config (rw)
+      /var/lib/mysql/ from datadir (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-nnvg8 (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  datadir:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  datadir-mariadb-sts-0
+    ReadOnly:   false
+  mariadb-config-map:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      mariadb-configmap
+    Optional:  false
+  mariadb-config:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+  initdb:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+  kube-api-access-nnvg8:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  7s    default-scheduler  Successfully assigned kang/mariadb-sts-0 to minikube
+  Normal  Pulling    7s    kubelet            Pulling image "mariadb"
+  Normal  Pulled     5s    kubelet            Successfully pulled image "mariadb" in 2.027659394s (2.027668132s including waiting)
+  Normal  Created    5s    kubelet            Created container init-mariadb
+  Normal  Started    5s    kubelet            Started container init-mariadb
+  Normal  Pulling    4s    kubelet            Pulling image "mariadb"
+  Normal  Pulled     2s    kubelet            Successfully pulled image "mariadb" in 1.989335293s (1.989342592s including waiting)
+  Normal  Created    2s    kubelet            Created container mariadb
+  Normal  Started    2s    kubelet            Started container mariadb
